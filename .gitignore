@@ -1,0 +1,30 @@
+# ---- 依赖与构建产物 ----
+/node_modules
+**/node_modules
+/oh_modules
+**/oh_modules
+**/build
+**/.test
+.cxx
+/.appanalyzer
+
+# ---- 工具链与 IDE 本地状态 ----
+/.hvigor
+/.idea
+/.clangd
+/.clang-format
+/.clang-tidy
+/local.properties
+
+# ---- 签名材料与证书：严禁提交 ----
+*.p12
+*.p7b
+*.cer
+*.csr
+*.keystore
+*.jks
+
+# 实际签名配置（含证书路径与口令）不进版本库，只保留无密钥模板
+/signing/*
+!/signing/README.md
+!/signing/signing-configs.template.json5

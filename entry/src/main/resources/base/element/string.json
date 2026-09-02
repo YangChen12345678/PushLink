@@ -1,0 +1,48 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "PushLink 通知转发主模块"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "PushLink 配置与状态页"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "PushLink"
+    },
+    {
+      "name": "NotificationSubscriberExtAbility_desc",
+      "value": "接收本机通知并转发到 Bark"
+    },
+    {
+      "name": "NotificationSubscriberExtAbility_label",
+      "value": "PushLink 通知订阅"
+    },
+    {
+      "name": "reason_internet",
+      "value": "将通知发送到 Bark 服务器"
+    },
+    {
+      "name": "reason_network_info",
+      "value": "判断网络是否可用以决定重试时机"
+    },
+    {
+      "name": "reason_running_lock",
+      "value": "息屏时短暂保持唤醒以完成发送"
+    },
+    {
+      "name": "reason_bundle_info",
+      "value": "显示已授权应用的名称与图标"
+    },
+    {
+      "name": "reason_bluetooth",
+      "value": "读取已配对设备地址以建立通知订阅"
+    },
+    {
+      "name": "reason_subscribe_notification",
+      "value": "订阅本机通知以转发到 Bark"
+    }
+  ]
+}

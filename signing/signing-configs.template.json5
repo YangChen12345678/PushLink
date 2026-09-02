@@ -1,0 +1,27 @@
+// PushLink 签名配置模板 —— 只描述结构，不含任何真实路径与口令。
+//
+// 用法：在 DevEco Studio 里用 File > Project Structure > Signing Configs 配置签名，
+// DevEco 会把结果自动写进项目根目录 build-profile.json5 的 app.signingConfigs 数组。
+// 那份带口令的实际配置【不要提交】。提交前确认：
+//     git diff build-profile.json5
+// 其中 signingConfigs 必须仍是空数组 []。
+//
+// 证书material（.p12 / .p7b / .cer）请放在本 signing/ 目录下，
+// .gitignore 已按扩展名与目录双重拦截。
+{
+  "signingConfigs": [
+    {
+      "name": "default",
+      "type": "HarmonyOS",
+      "material": {
+        "certpath": "signing/<你的证书>.cer",
+        "storePassword": "<DevEco 生成的密文，勿提交>",
+        "keyAlias": "<密钥别名>",
+        "keyPassword": "<DevEco 生成的密文，勿提交>",
+        "profile": "signing/<你的试用 Profile>.p7b",
+        "signAlg": "SHA256withECDSA",
+        "storeFile": "signing/<你的密钥库>.p12"
+      }
+    }
+  ]
+}

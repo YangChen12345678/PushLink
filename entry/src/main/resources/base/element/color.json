@@ -3,6 +3,38 @@
     {
       "name": "start_window_background",
       "value": "#FFFFFF"
+    },
+    {
+      "name": "pl_text_muted",
+      "value": "#8A8A8E"
+    },
+    {
+      "name": "pl_status_ok",
+      "value": "#1E9E5A"
+    },
+    {
+      "name": "pl_status_error",
+      "value": "#C0392B"
+    },
+    {
+      "name": "pl_status_warn",
+      "value": "#E08A00"
+    },
+    {
+      "name": "pl_accent",
+      "value": "#0A59F7"
+    },
+    {
+      "name": "pl_card_bg",
+      "value": "#F5F5F7"
+    },
+    {
+      "name": "pl_error_bg",
+      "value": "#FDECEA"
+    },
+    {
+      "name": "pl_on_accent",
+      "value": "#FFFFFF"
     }
   ]
 }

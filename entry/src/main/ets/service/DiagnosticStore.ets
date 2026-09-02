@@ -8,14 +8,19 @@ const SCOPE: string = 'Diagnostic';
 /** 只留最近这么多条，够排查即可，不做历史归档。 */
 const KEEP_ROWS: number = 60;
 
-/** 一次处理的结果分类。取值刻意做成可直接上屏的短标签。 */
-export enum Outcome {
-  SENT = '已送达',
-  DROPPED = '未授权已丢弃',
-  QUEUED = '已入队待重试',
-  FAILED = '发送失败',
-  EXPIRED = '超时未送达已丢弃',
-  CANCELLED = '已撤回'
+/**
+ * 一次处理的结果分类。取值刻意做成可直接上屏的短标签。
+ *
+ * 用静态常量而不是 enum：枚举成员传给 ValuesBucket 或查询谓词时过不了
+ * ArkTS 的参数校验（会以 401 拒绝），这里直接就是 string，没有转换环节。
+ */
+export class Outcome {
+  static readonly SENT: string = '已送达';
+  static readonly DROPPED: string = '未授权已丢弃';
+  static readonly QUEUED: string = '已入队待重试';
+  static readonly FAILED: string = '发送失败';
+  static readonly EXPIRED: string = '超时未送达已丢弃';
+  static readonly CANCELLED: string = '已撤回';
 }
 
 /**
@@ -45,13 +50,39 @@ export class DiagnosticStore {
         'created_at': entry.createdAt
       };
       await store.insert(TABLE_DIAGNOSTICS, values);
-      await store.executeSql(
-        `DELETE FROM ${TABLE_DIAGNOSTICS} WHERE id NOT IN ` +
-        `(SELECT id FROM ${TABLE_DIAGNOSTICS} ORDER BY created_at DESC LIMIT ?)`, [KEEP_ROWS]);
+      await DiagnosticStore.trim(store);
     } catch (err) {
       const e: BusinessError = err as BusinessError;
       Logger.e(SCOPE, `record failed code=${e.code}`);
     }
+  }
+
+  /**
+   * 只保留最近 KEEP_ROWS 条。与 OutboxStore.enforceLimit 同理，
+   * 不用带 LIMIT 占位符的子查询——参数没绑上时 `NOT IN (全表)` 恒为空集，
+   * 清理会静默失效，表只增不减。
+   */
+  private static async trim(store: relationalStore.RdbStore): Promise<void> {
+    const boundary: relationalStore.RdbPredicates =
+      new relationalStore.RdbPredicates(TABLE_DIAGNOSTICS);
+    boundary.orderByDesc('created_at');
+    boundary.limitAs(KEEP_ROWS);
+    const result: relationalStore.ResultSet = await store.query(boundary, ['created_at']);
+    let cutoff: number = 0;
+    try {
+      if (result.rowCount >= KEEP_ROWS && result.goToLastRow()) {
+        cutoff = result.getLong(result.getColumnIndex('created_at'));
+      }
+    } finally {
+      result.close();
+    }
+    if (cutoff <= 0) {
+      return;
+    }
+    const stale: relationalStore.RdbPredicates =
+      new relationalStore.RdbPredicates(TABLE_DIAGNOSTICS);
+    stale.lessThan('created_at', cutoff);
+    await store.delete(stale);
   }
 
   static async recent(context: common.Context, limit: number): Promise<DiagnosticEntry[]> {
@@ -90,7 +121,7 @@ export class DiagnosticStore {
       const store: relationalStore.RdbStore = await Database.get(context);
       const predicates: relationalStore.RdbPredicates =
         new relationalStore.RdbPredicates(TABLE_DIAGNOSTICS);
-      predicates.equalTo('outcome', Outcome.SENT.valueOf());
+      predicates.equalTo('outcome', Outcome.SENT);
       predicates.orderByDesc('created_at');
       predicates.limitAs(1);
       const result: relationalStore.ResultSet = await store.query(predicates, ['created_at']);

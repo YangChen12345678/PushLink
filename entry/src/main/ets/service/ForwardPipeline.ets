@@ -47,7 +47,7 @@ export class ForwardPipeline {
       await DiagnosticStore.record(context, {
         eventId: eventId,
         bundleName: bundleName,
-        outcome: Outcome.DROPPED.valueOf(),
+        outcome: Outcome.DROPPED,
         elapsedMs: Date.now() - started,
         detailCode: 0,
         createdAt: Date.now()
@@ -62,7 +62,7 @@ export class ForwardPipeline {
       await DiagnosticStore.record(context, {
         eventId: eventId,
         bundleName: bundleName,
-        outcome: Outcome.FAILED.valueOf(),
+        outcome: Outcome.FAILED,
         elapsedMs: Date.now() - started,
         detailCode: 0,
         createdAt: Date.now()
@@ -106,7 +106,7 @@ export class ForwardPipeline {
       await DiagnosticStore.record(context, {
         eventId: eventId,
         bundleName: bundleName,
-        outcome: Outcome.FAILED.valueOf(),
+        outcome: Outcome.FAILED,
         elapsedMs: Date.now() - started,
         detailCode: 0,
         createdAt: Date.now()
@@ -214,7 +214,7 @@ export class ForwardPipeline {
         eventId: record.eventId,
         bundleName: '',
         outcome: record.kind === OutboxKind.CANCEL
-          ? Outcome.CANCELLED.valueOf() : Outcome.SENT.valueOf(),
+          ? Outcome.CANCELLED : Outcome.SENT,
         elapsedMs: result.elapsedMs,
         detailCode: 0,
         createdAt: Date.now()
@@ -226,7 +226,7 @@ export class ForwardPipeline {
     await DiagnosticStore.record(context, {
       eventId: record.eventId,
       bundleName: '',
-      outcome: Outcome.QUEUED.valueOf(),
+      outcome: Outcome.QUEUED,
       elapsedMs: result.elapsedMs,
       detailCode: result.httpCode !== 0 ? result.httpCode : result.barkCode,
       createdAt: Date.now()
@@ -247,7 +247,7 @@ export class ForwardPipeline {
       await DiagnosticStore.record(context, {
         eventId: `${removed} 条`,
         bundleName: '',
-        outcome: Outcome.EXPIRED.valueOf(),
+        outcome: Outcome.EXPIRED,
         elapsedMs: 0,
         detailCode: 0,
         createdAt: Date.now()

@@ -37,9 +37,12 @@ export class OutboxStore {
   static async enqueue(context: common.Context, record: OutboxRecord): Promise<boolean> {
     try {
       const store: relationalStore.RdbStore = await Database.get(context);
+      // 必须显式落成 number：ValuesBucket 只收 number/string/boolean/Uint8Array/null，
+      // 直接塞枚举成员（哪怕调了 valueOf）过不了参数校验，整条 insert 会被以 401 拒掉。
+      const kindValue: number = record.kind === OutboxKind.CANCEL ? 1 : 0;
       const values: relationalStore.ValuesBucket = {
         'event_id': record.eventId,
-        'kind': record.kind.valueOf(),
+        'kind': kindValue,
         'ciphertext': record.ciphertext,
         'iv': record.iv,
         'created_at': record.createdAt,
@@ -164,23 +167,46 @@ export class OutboxStore {
     }
   }
 
-  /** 超出上限时丢弃最旧的若干条。 */
+  /**
+   * 超出上限时丢弃最旧的若干条。
+   *
+   * 刻意不用 `DELETE ... WHERE id IN (SELECT ... LIMIT ?)`：那种写法一旦参数没绑上，
+   * SQLite 会把 LIMIT 当成无限制，子查询返回全表，整个队列被删光——
+   * 断网攒下的消息会在越过上限的瞬间全部蒸发。这里改用谓词接口，不碰 SQL 参数绑定。
+   */
   private static async enforceLimit(store: relationalStore.RdbStore): Promise<void> {
-    const result: relationalStore.ResultSet =
+    const countResult: relationalStore.ResultSet =
       await store.query(new relationalStore.RdbPredicates(TABLE_OUTBOX), ['event_id']);
     let total: number = 0;
     try {
-      total = result.rowCount;
+      total = countResult.rowCount;
     } finally {
-      result.close();
+      countResult.close();
     }
     if (total <= OUTBOX_MAX) {
       return;
     }
-    const overflow: number = total - OUTBOX_MAX;
-    await store.executeSql(
-      `DELETE FROM ${TABLE_OUTBOX} WHERE event_id IN ` +
-      `(SELECT event_id FROM ${TABLE_OUTBOX} ORDER BY created_at ASC LIMIT ?)`, [overflow]);
-    Logger.w(SCOPE, `enforceLimit dropped=${overflow} total=${total}`);
+
+    // 取按时间倒序的第 OUTBOX_MAX 条，它的时间戳就是保留边界。
+    const boundary: relationalStore.RdbPredicates = new relationalStore.RdbPredicates(TABLE_OUTBOX);
+    boundary.orderByDesc('created_at');
+    boundary.limitAs(OUTBOX_MAX);
+    const boundaryResult: relationalStore.ResultSet = await store.query(boundary, ['created_at']);
+    let cutoff: number = 0;
+    try {
+      if (boundaryResult.rowCount >= OUTBOX_MAX && boundaryResult.goToLastRow()) {
+        cutoff = boundaryResult.getLong(boundaryResult.getColumnIndex('created_at'));
+      }
+    } finally {
+      boundaryResult.close();
+    }
+    if (cutoff <= 0) {
+      return;
+    }
+
+    const stale: relationalStore.RdbPredicates = new relationalStore.RdbPredicates(TABLE_OUTBOX);
+    stale.lessThan('created_at', cutoff);
+    const removed: number = await store.delete(stale);
+    Logger.w(SCOPE, `enforceLimit dropped=${removed} total=${total}`);
   }
 }

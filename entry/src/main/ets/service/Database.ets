@@ -1,5 +1,6 @@
 import { relationalStore } from '@kit.ArkData';
 import { common } from '@kit.AbilityKit';
+import { BusinessError } from '@kit.BasicServicesKit';
 import { Logger } from '../common/Logger';
 
 const SCOPE: string = 'Database';
@@ -83,12 +84,21 @@ export class Database {
   }
 
   private static async open(context: common.Context): Promise<relationalStore.RdbStore> {
-    const store: relationalStore.RdbStore = await relationalStore.getRdbStore(context, STORE_CONFIG);
-    for (const statement of DDL) {
-      await store.executeSql(statement);
+    try {
+      const store: relationalStore.RdbStore = await relationalStore.getRdbStore(context, STORE_CONFIG);
+      for (const statement of DDL) {
+        await store.executeSql(statement);
+      }
+      Database.store = store;
+      Logger.i(SCOPE, 'store ready');
+      return store;
+    } catch (err) {
+      const e: BusinessError = err as BusinessError;
+      Logger.e(SCOPE, `open failed code=${e.code} msg=${e.message}`);
+      // 必须清掉这次的 Promise。否则后续每次 get() 都会拿到同一个已拒绝的 Promise，
+      // 数据库在本进程存活期间再也打不开，一次瞬时失败会演变成永久性故障。
+      Database.opening = undefined;
+      throw err as Error;
     }
-    Database.store = store;
-    Logger.i(SCOPE, 'store ready');
-    return store;
   }
 }

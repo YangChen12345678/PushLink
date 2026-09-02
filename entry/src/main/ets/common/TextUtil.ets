@@ -41,3 +41,26 @@ export function truncateUtf8(text: string, maxBytes: number): string {
 export function utf8Length(text: string): number {
   return new util.TextEncoder().encodeInto(text).length;
 }
+
+/**
+ * 拼出带来源应用名的通知标题，如「[微信] 张三：晚上吃什么」。
+ *
+ * Bark 无法显示来源应用的图标——系统没有获取他人应用图标的公开接口，
+ * 且 Bark 的 icon 参数只收公网 URL，把本地图标传上去等于泄露"哪个应用给你发了通知"。
+ * 前缀是在不牺牲隐私的前提下解决辨识度的办法。
+ *
+ * 截断顺序很重要：先给前缀留出预算，再截断标题本体。
+ * 反过来先截断再拼接会超出 Bark 的标题上限。
+ */
+export function composeTitle(appLabel: string, rawTitle: string): string {
+  if (appLabel.length === 0) {
+    return truncateUtf8(rawTitle, TITLE_MAX_BYTES);
+  }
+  const prefix: string = `[${appLabel}] `;
+  const prefixBytes: number = utf8Length(prefix);
+  // 应用名长到吃掉整个预算时放弃前缀——保住标题本体比标出来源重要。
+  if (prefixBytes >= TITLE_MAX_BYTES) {
+    return truncateUtf8(rawTitle, TITLE_MAX_BYTES);
+  }
+  return prefix + truncateUtf8(rawTitle, TITLE_MAX_BYTES - prefixBytes);
+}

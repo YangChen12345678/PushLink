@@ -105,7 +105,15 @@ struct Index {
             .margin({ top: Space.md })
         }
 
-        LinkSection({ link: this.link })
+        LinkSection({
+          link: this.link,
+          busy: this.busy,
+          onRequestNotify: () => {
+            this.run(async (ctx: common.UIAbilityContext) => {
+              await this.link.requestNotifyPermission(ctx);
+            });
+          }
+        })
 
         BluetoothSection({
           link: this.link,

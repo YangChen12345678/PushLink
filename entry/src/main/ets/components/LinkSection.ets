@@ -2,10 +2,12 @@ import { Color as Tok, FontSize, Space } from '../theme/Tokens';
 import { LinkState } from '../viewmodel/LinkState';
 import { SectionCard, SectionHeader, StatusRow } from './Common';
 
-/** 区 1：转发链路的综合状态。纯展示，无动作。 */
+/** 区 1：转发链路的综合状态。 */
 @Component
 export struct LinkSection {
   @ObjectLink link: LinkState;
+  @Prop busy: boolean = false;
+  onRequestNotify: () => void = () => {};
 
   build() {
     Column() {
@@ -31,6 +33,22 @@ export struct LinkSection {
           value: this.link.snap.userGranted ? '已开启' : '未开启',
           ok: this.link.snap.userGranted
         })
+        StatusRow({
+          label: '中断提醒',
+          value: this.link.notifyEnabled ? '已开启' : '未开启',
+          ok: this.link.notifyEnabled
+        })
+        if (!this.link.notifyEnabled) {
+          // 没有这条提醒，蓝牙被关掉后用户只会在某天发现「iPhone 半天没消息了」，
+          // 却不知道原因。所以值得专门引导开启。
+          Text('开启后，蓝牙被关闭导致转发中断时会收到提示。')
+            .fontSize(FontSize.footnote).fontColor(Tok.muted).width('100%')
+            .margin({ top: Space.xs })
+          Button('开启中断提醒')
+            .fontSize(FontSize.label).width('100%').margin({ top: Space.sm })
+            .enabled(!this.busy)
+            .onClick(() => { this.onRequestNotify(); })
+        }
         if (this.link.snap.lastError.length > 0) {
           Text(this.link.snap.lastError)
             .fontSize(FontSize.footnote)

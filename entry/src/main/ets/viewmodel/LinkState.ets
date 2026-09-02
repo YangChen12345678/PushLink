@@ -4,6 +4,7 @@ import { BluetoothService, PairedDevice, PairedDeviceListResult } from '../servi
 import { PermissionService } from '../service/PermissionService';
 import { SubscriptionService, SubscriptionSnapshot } from '../service/SubscriptionService';
 import { GrantStore } from '../service/GrantStore';
+import { HealthMonitor } from '../service/HealthMonitor';
 
 export function emptySnapshot(): SubscriptionSnapshot {
   return {
@@ -29,6 +30,8 @@ export class LinkState {
   deviceError: number = 0;
   selectedAddr: string = '';
   snap: SubscriptionSnapshot = emptySnapshot();
+  /** 能否发出中断提醒。用户没给通知权限时提醒发不出去，界面要能说明。 */
+  notifyEnabled: boolean = false;
   notice: string = '';
 
   /**
@@ -86,6 +89,14 @@ export class LinkState {
 
   async refreshSubscription(): Promise<void> {
     this.snap = await SubscriptionService.snapshot();
+    this.notifyEnabled = await HealthMonitor.canNotify();
+  }
+
+  async requestNotifyPermission(ctx: common.UIAbilityContext): Promise<void> {
+    this.notifyEnabled = await HealthMonitor.requestPermission(ctx);
+    if (!this.notifyEnabled) {
+      this.notice = '未获得通知权限，链路中断时无法提醒你。可在系统设置里手动开启。';
+    }
   }
 
   /**

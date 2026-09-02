@@ -2,13 +2,14 @@ import { common } from '@kit.AbilityKit';
 import { runningLock } from '@kit.BasicServicesKit';
 import { notificationExtensionSubscription } from '@kit.NotificationKit';
 import { Logger, Redact } from '../common/Logger';
-import { BODY_MAX_BYTES, TITLE_MAX_BYTES, truncateUtf8 } from '../common/TextUtil';
+import { BODY_MAX_BYTES, composeTitle, truncateUtf8 } from '../common/TextUtil';
 import { computeEventId } from '../crypto/EventId';
 import { BarkCrypto } from '../crypto/BarkCrypto';
 import { BarkClient, BarkPayload, BarkSendResult } from './BarkClient';
 import { BarkConfig, ConfigStore, isConfigComplete } from './ConfigStore';
 import { DiagnosticStore, Outcome } from './DiagnosticStore';
 import { GrantStore } from './GrantStore';
+import { GrantedBundle } from '../common/Types';
 import { DRAIN_BATCH, OUTBOX_TTL_MS, OutboxKind, OutboxRecord, OutboxStore } from './OutboxStore';
 
 const SCOPE: string = 'Pipeline';
@@ -41,8 +42,10 @@ export class ForwardPipeline {
     const eventId: string = await computeEventId(info.hashCode);
 
     // 默认拒绝：不在系统授权白名单里的来源一律丢弃，绝不外发。
-    const granted: boolean = await GrantStore.isGranted(context, bundleName, info.appIndex);
-    if (!granted) {
+    // 顺带取回应用名用作标题前缀，不额外查一次库。
+    const granted: GrantedBundle | undefined =
+      await GrantStore.findGranted(context, bundleName, info.appIndex);
+    if (granted === undefined) {
       Logger.i(SCOPE, `drop not-granted bundle=${bundleName} appIndex=${info.appIndex}`);
       await DiagnosticStore.record(context, {
         eventId: eventId,
@@ -70,11 +73,17 @@ export class ForwardPipeline {
       return;
     }
 
+    // 优先用回调自带的应用名，缺失时回落到白名单里系统记录的那个。
+    const appLabel: string = info.appName !== undefined && info.appName.length > 0
+      ? info.appName
+      : granted.appName;
     const payload: BarkPayload = {
-      title: truncateUtf8(info.content.title, TITLE_MAX_BYTES),
+      // 标题带上来源，如「[微信] 张三：晚上吃什么」——Bark 显示不了应用图标，
+      // 前缀是不牺牲隐私的辨识度方案。group 与 title 都在加密内容里，服务端看不到。
+      title: composeTitle(appLabel, info.content.title),
       body: truncateUtf8(info.content.text, BODY_MAX_BYTES),
-      // 用来源包名分组，iPhone 上可按应用归类。
-      group: bundleName,
+      // 用应用名分组，iPhone 上按应用归类时可读性比包名好。
+      group: appLabel.length > 0 ? appLabel : bundleName,
       level: 'active',
       action: 'none'
     };

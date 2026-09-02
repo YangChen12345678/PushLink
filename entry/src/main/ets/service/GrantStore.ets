@@ -47,25 +47,47 @@ export class GrantStore {
   }
 
   /**
-   * 判断某个来源是否已授权。
-   * 任何异常都返回 false——宁可漏发也不能误发。
+   * 查出白名单条目，未授权时返回 undefined。
+   *
+   * 顺带取回系统记录的应用名——投递时要用它做通知标题前缀。
+   * 合并成一次查询而不是过滤后再查一次：连续通知场景下能省掉一半的库读取，
+   * 而且这个名字来自系统授权列表，比什么都准。
    */
-  static async isGranted(context: common.Context, bundleName: string, appIndex: number): Promise<boolean> {
+  static async findGranted(context: common.Context, bundleName: string,
+    appIndex: number): Promise<GrantedBundle | undefined> {
     try {
       const store: relationalStore.RdbStore = await Database.get(context);
       const predicates: relationalStore.RdbPredicates = new relationalStore.RdbPredicates(TABLE_GRANTS);
       predicates.equalTo('grant_key', grantKey(bundleName, appIndex));
-      const result: relationalStore.ResultSet = await store.query(predicates, ['grant_key']);
+      const result: relationalStore.ResultSet =
+        await store.query(predicates, ['grant_key', 'bundle_name', 'app_index', 'app_name']);
       try {
-        return result.rowCount > 0;
+        if (!result.goToFirstRow()) {
+          return undefined;
+        }
+        return {
+          bundleName: result.getString(result.getColumnIndex('bundle_name')),
+          appIndex: result.getLong(result.getColumnIndex('app_index')),
+          appName: result.getString(result.getColumnIndex('app_name')),
+          key: result.getString(result.getColumnIndex('grant_key'))
+        };
       } finally {
         result.close();
       }
     } catch (err) {
       const e: BusinessError = err as BusinessError;
-      Logger.e(SCOPE, `isGranted failed code=${e.code}`);
-      return false;
+      Logger.e(SCOPE, `findGranted failed code=${e.code}`);
+      return undefined;
     }
+  }
+
+  /**
+   * 判断某个来源是否已授权。
+   * 任何异常都返回 false——宁可漏发也不能误发。
+   */
+  static async isGranted(context: common.Context, bundleName: string, appIndex: number): Promise<boolean> {
+    const found: GrantedBundle | undefined = await GrantStore.findGranted(context, bundleName, appIndex);
+    return found !== undefined;
   }
 
   static async count(context: common.Context): Promise<number> {

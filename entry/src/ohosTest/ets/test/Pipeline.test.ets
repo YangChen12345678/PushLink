@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@ohos/hypium';
-import { BODY_MAX_BYTES, truncateUtf8, utf8Length } from '../../../main/ets/common/TextUtil';
+import { BODY_MAX_BYTES, TITLE_MAX_BYTES, composeTitle, truncateUtf8, utf8Length } from '../../../main/ets/common/TextUtil';
 import { grantKey } from '../../../main/ets/common/Types';
 import { BarkCrypto } from '../../../main/ets/crypto/BarkCrypto';
 import { computeEventId } from '../../../main/ets/crypto/EventId';
@@ -51,6 +51,41 @@ export default function pipelineTest() {
       const result: string = truncateUtf8(long, BODY_MAX_BYTES);
       expect(utf8Length(result) <= BODY_MAX_BYTES).assertTrue();
       expect(result.length > 0).assertTrue();
+    });
+
+    // ---------- 标题前缀 ----------
+
+    it('title_prefixes_source_app', 0, () => {
+      expect(composeTitle('微信', '张三：晚上吃什么')).assertEqual('[微信] 张三：晚上吃什么');
+    });
+
+    it('title_without_app_name_stays_plain', 0, () => {
+      // 拿不到应用名时不能留下空的方括号。
+      expect(composeTitle('', '原始标题')).assertEqual('原始标题');
+    });
+
+    it('title_budget_counts_prefix', 0, () => {
+      // 截断顺序是关键：必须先给前缀留预算再截标题，
+      // 反过来先截标题再拼前缀会超出 Bark 的上限。
+      // 用固定次数构造而不是 while + 长度比较——循环条件依赖外部常量时，
+      // 一旦求值异常就会退不出正常路径，把断言失败伪装成运行时错误。
+      let long: string = '';
+      for (let i = 0; i < 100; i++) {
+        long += '很长的标题内容';    // 每轮 21 字节，共约 2100 字节
+      }
+      const result: string = composeTitle('微信', long);
+      expect(utf8Length(result) <= TITLE_MAX_BYTES).assertTrue();
+      expect(result.startsWith('[微信] ')).assertTrue();
+    });
+
+    it('title_drops_prefix_when_app_name_too_long', 0, () => {
+      // 应用名长到吃掉整个预算时放弃前缀——保住标题本体比标出来源重要。
+      let hugeName: string = '';
+      for (let i = 0; i < 100; i++) {
+        hugeName += '超长应用名';    // 每轮 15 字节，共约 1500 字节，远超标题上限
+      }
+      const result: string = composeTitle(hugeName, '正文标题');
+      expect(result).assertEqual('正文标题');
     });
 
     // ---------- 白名单键 ----------

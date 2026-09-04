@@ -1,7 +1,7 @@
 import { Color as Tok, FontSize, Radius, Space } from '../theme/Tokens';
 import { DEFAULT_BARK_SERVER } from '../service/ConfigStore';
 import { ConfigState } from '../viewmodel/ConfigState';
-import { SectionCard, SectionHeader } from './Common';
+import { GroupTitle, SectionCard } from './Common';
 
 /**
  * maskedField 的参数必须包成对象。
@@ -48,7 +48,7 @@ export struct ConfigSection {
 
   build() {
     Column() {
-      SectionHeader({ index: 4, title: 'Bark 服务与加密配置' })
+      GroupTitle({ text: 'Bark 服务' })
       SectionCard({ alignStart: true, gap: Space.xs + 2 }) {
         Text('Device Key 与加密 Key 只存在本机加密数据库里，不进日志、不进备份。')
           .fontSize(FontSize.footnote).fontColor(Tok.muted).width('100%')

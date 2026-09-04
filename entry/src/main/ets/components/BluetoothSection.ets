@@ -1,7 +1,7 @@
 import { Color as Tok, FontSize, Space } from '../theme/Tokens';
 import { PairedDevice } from '../service/BluetoothService';
 import { LinkState } from '../viewmodel/LinkState';
-import { SectionCard, SectionHeader, StatusRow } from './Common';
+import { GroupTitle, SectionCard, StatusRow } from './Common';
 
 /** 区 2：蓝牙权限、已配对设备选择、订阅登记。 */
 @Component
@@ -14,7 +14,7 @@ export struct BluetoothSection {
 
   build() {
     Column() {
-      SectionHeader({ index: 2, title: '已配对蓝牙设备' })
+      GroupTitle({ text: '蓝牙与订阅' })
       SectionCard() {
         StatusRow({
           label: '蓝牙权限',

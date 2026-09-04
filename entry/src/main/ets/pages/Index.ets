@@ -2,20 +2,34 @@ import { common } from '@kit.AbilityKit';
 import { Color as Tok, FontSize, Radius, Space } from '../theme/Tokens';
 import { CryptoSelfTest, SelfTestCase } from '../crypto/CryptoSelfTest';
 import { ForwardPipeline } from '../service/ForwardPipeline';
+import { HealthMonitor } from '../service/HealthMonitor';
 import { LinkState } from '../viewmodel/LinkState';
 import { ConfigState } from '../viewmodel/ConfigState';
 import { DiagnosticState } from '../viewmodel/DiagnosticState';
-import { LinkSection } from '../components/LinkSection';
+import { HealthCard } from '../components/HealthCard';
 import { BluetoothSection } from '../components/BluetoothSection';
 import { GrantSection } from '../components/GrantSection';
 import { ConfigSection } from '../components/ConfigSection';
+import { SelfTestSection } from '../components/SelfTestSection';
 import { DiagnosticSection } from '../components/DiagnosticSection';
+import { MineSection } from '../components/MineSection';
+import { GroupTitle, SectionCard } from '../components/Common';
+
+const APP_VERSION: string = '1.0.0';
+
+interface TabItem {
+  title: string;
+  index: number;
+}
 
 /**
- * 主页面。只做三件事：持有状态、编排跨状态的流程、组装区块。
+ * 主页面。分四个标签：状态、配置、诊断、我。
  *
- * 具体的业务逻辑在 viewmodel/ 下，具体的渲染在 components/ 下。
- * 这样宽屏布局（阶段 G）可以换一套组装方式而复用同一份状态与流程。
+ * 分屏的依据是使用频率：链路状态每天要看，Bark 配置和加密自检装完基本不再碰，
+ * 诊断只在怀疑哪里不对时才来。之前五个区块堆成一条长滚动，视觉权重完全一样。
+ *
+ * 标签骨架用原生 Tabs 而不是 HdsTabs：骨架出问题会影响整个界面，
+ * 而 HdsTabs 的增量能力（迷你栏、浮动样式）这里用不上。
  */
 @Entry
 @Component
@@ -29,8 +43,24 @@ struct Index {
    * 按钮的禁用态会失灵。busy 本来也是 UI 关注点，不属于业务状态。
    */
   @State busy: boolean = false;
-  /** 测试用例是常量，取一次即可，避免 ForEach 每帧重建数组。 */
+  @State activeTab: number = 0;
   private readonly testCases: SelfTestCase[] = CryptoSelfTest.cases();
+  private readonly tabs: TabItem[] = [
+    { title: '状态', index: 0 },
+    { title: '配置', index: 1 },
+    { title: '诊断', index: 2 },
+    { title: '我', index: 3 }
+  ];
+  private controller: TabsController = new TabsController();
+
+  /**
+   * 蓝牙状态一变就刷新界面。
+   * 用箭头函数属性而非方法，是为了让 this 稳定绑定到实例，
+   * 同时保证注册与注销传的是同一个引用——方法引用每次取值都是新对象，注销会失败。
+   */
+  private bluetoothWatcher: () => void = () => {
+    this.link.refreshBluetooth();
+  };
 
   /**
    * 配置只在页面创建时读一次。
@@ -39,6 +69,11 @@ struct Index {
    */
   aboutToAppear(): void {
     this.loadConfig();
+    HealthMonitor.addWatcher(this.bluetoothWatcher);
+  }
+
+  aboutToDisappear(): void {
+    HealthMonitor.removeWatcher(this.bluetoothWatcher);
   }
 
   /** 每次回到前台重取订阅与蓝牙状态。授权列表以系统返回为准，不做本地累积。 */
@@ -87,110 +122,227 @@ struct Index {
     await this.diag.refresh(ctx);
   }
 
-  build() {
-    Scroll() {
-      Column() {
-        Text('PushLink').fontSize(FontSize.display).fontWeight(FontWeight.Bold).width('100%')
-        Text('阶段 B · 通知订阅验证')
-          .fontSize(FontSize.footnote).fontColor(Tok.muted).width('100%').margin({ top: 2 })
-
-        if (this.link.notice.length > 0) {
-          Text(this.link.notice)
-            .fontSize(FontSize.caption)
-            .fontColor(Tok.error)
-            .width('100%')
-            .padding(10)
-            .backgroundColor(Tok.errorBg)
-            .borderRadius(Radius.chip)
-            .margin({ top: Space.md })
-        }
-
-        LinkSection({
-          link: this.link,
-          busy: this.busy,
-          onRequestNotify: () => {
-            this.run(async (ctx: common.UIAbilityContext) => {
-              await this.link.requestNotifyPermission(ctx);
-            });
-          }
-        })
-
-        BluetoothSection({
-          link: this.link,
-          busy: this.busy,
-          onRequestPermission: () => {
-            this.run(async (ctx: common.UIAbilityContext) => {
-              await this.link.requestBluetooth(ctx);
-            });
-          },
-          onSubscribe: () => {
-            this.run(async (ctx: common.UIAbilityContext) => {
-              await this.link.subscribe();
-              await this.refreshAll();
-            });
-          },
-          onUnsubscribe: () => {
-            this.run(async (ctx: common.UIAbilityContext) => {
-              await this.link.unsubscribe();
-              await this.refreshAll();
-            });
-          }
-        })
-
-        GrantSection({
-          link: this.link,
-          busy: this.busy,
-          onOpenSettings: () => {
-            this.run(async (ctx: common.UIAbilityContext) => {
-              await this.link.openSettings(ctx);
-              // 半模态关闭后系统状态可能已变，整体重取而非只用返回值。
-              await this.refreshAll();
-            });
-          }
-        })
-
-        ConfigSection({
-          config: this.config,
-          busy: this.busy,
-          onSave: () => {
-            this.run(async (ctx: common.UIAbilityContext) => {
-              await this.config.save(ctx);
-            });
-          }
-        })
-
-        DiagnosticSection({
-          config: this.config,
-          diag: this.diag,
-          busy: this.busy,
-          cases: this.testCases,
-          onSelfTest: () => {
-            this.run(async (ctx: common.UIAbilityContext) => {
-              await this.config.runSelfTest();
-            });
-          },
-          onSendTest: () => {
-            this.run(async (ctx: common.UIAbilityContext) => {
-              await this.config.sendTest();
-            });
-          },
-          onDrain: () => {
-            this.run(async (ctx: common.UIAbilityContext) => {
-              await this.diag.drainNow(ctx);
-            });
-          },
-          onClearDiagnostics: () => {
-            this.run(async (ctx: common.UIAbilityContext) => {
-              await this.diag.clear(ctx);
-            });
-          }
-        })
-
-        Blank().height(Space.xxl)
-      }
-      .width('100%').padding({ left: Space.xl, right: Space.xl, top: Space.xxl })
-      .alignItems(HorizontalAlign.Start)
+  @Builder
+  tabBar(item: TabItem) {
+    Column({ space: 3 }) {
+      // 用色块而非图标：项目没有自己的图标集，随便找的图标反而拉低一致性。
+      Row()
+        .width(18).height(18).borderRadius(5)
+        .backgroundColor(this.activeTab === item.index ? Tok.accent : Tok.muted)
+        .opacity(this.activeTab === item.index ? 1 : 0.4)
+      Text(item.title)
+        .fontSize(FontSize.tiny)
+        .fontColor(this.activeTab === item.index ? Tok.accent : Tok.muted)
+        .fontWeight(this.activeTab === item.index ? FontWeight.Medium : FontWeight.Normal)
     }
-    .width('100%').height('100%').scrollBar(BarState.Auto)
+    .width('100%')
+    .padding({ top: Space.sm, bottom: Space.sm })
+    .accessibilityText(item.title)
+  }
+
+  build() {
+    // 不把 index 绑成受控属性：当前页由 Tabs 自己管，activeTab 只用于驱动 tabBar 高亮。
+    // 两者都绑会让「内部切换 → 回调 → 状态更新 → 重新渲染」形成一圈多余的往返。
+    Tabs({ barPosition: BarPosition.End, controller: this.controller }) {
+
+      // ---------- 状态 ----------
+      TabContent() {
+        Scroll() {
+          Column() {
+            Text('PushLink')
+              .fontSize(FontSize.display).fontWeight(FontWeight.Bold).width('100%')
+              .margin({ bottom: Space.md })
+
+            if (this.link.notice.length > 0) {
+              Text(this.link.notice)
+                .fontSize(FontSize.caption).fontColor(Tok.error).width('100%')
+                .padding(10).backgroundColor(Tok.errorBg).borderRadius(Radius.chip)
+                .margin({ bottom: Space.md })
+            }
+
+            HealthCard({
+              link: this.link,
+              busy: this.busy,
+              onOpenGrantSettings: () => {
+                this.run(async (ctx: common.UIAbilityContext) => {
+                  await this.link.openSettings(ctx);
+                  await this.refreshAll();
+                });
+              },
+              onOpenBluetoothSettings: () => {
+                this.link.notice = '请在控制中心或系统设置里打开蓝牙，然后返回本页。';
+              },
+              onGotoSubscribe: () => {
+                this.link.notice = '请在下方「蓝牙与订阅」中选择一台设备并点订阅。';
+              }
+            })
+
+            if (!this.link.notifyEnabled) {
+              GroupTitle({ text: '中断提醒' })
+              SectionCard({ alignStart: true }) {
+                Text('开启后，蓝牙被关闭导致转发中断时会收到提示。'
+                  + '否则链路断了不会有任何征兆。')
+                  .fontSize(FontSize.footnote).fontColor(Tok.muted).width('100%')
+                Button('开启中断提醒')
+                  .fontSize(FontSize.label).width('100%').margin({ top: Space.sm })
+                  .enabled(!this.busy)
+                  .onClick(() => {
+                    this.run(async (ctx: common.UIAbilityContext) => {
+                      await this.link.requestNotifyPermission(ctx);
+                    });
+                  })
+              }
+            }
+
+            BluetoothSection({
+              link: this.link,
+              busy: this.busy,
+              onRequestPermission: () => {
+                this.run(async (ctx: common.UIAbilityContext) => {
+                  await this.link.requestBluetooth(ctx);
+                });
+              },
+              onSubscribe: () => {
+                this.run(async (ctx: common.UIAbilityContext) => {
+                  await this.link.subscribe();
+                  await this.refreshAll();
+                });
+              },
+              onUnsubscribe: () => {
+                this.run(async (ctx: common.UIAbilityContext) => {
+                  await this.link.unsubscribe();
+                  await this.refreshAll();
+                });
+              }
+            })
+
+            GrantSection({
+              link: this.link,
+              busy: this.busy,
+              onOpenSettings: () => {
+                this.run(async (ctx: common.UIAbilityContext) => {
+                  await this.link.openSettings(ctx);
+                  await this.refreshAll();
+                });
+              }
+            })
+
+            Blank().height(Space.xxl)
+          }
+          .width('100%').padding({ left: Space.xl, right: Space.xl, top: Space.xxl })
+          .alignItems(HorizontalAlign.Start)
+        }
+        .width('100%').height('100%').scrollBar(BarState.Auto)
+      }
+      .tabBar(this.tabBar(this.tabs[0]))
+
+      // ---------- 配置 ----------
+      TabContent() {
+        Scroll() {
+          Column() {
+            Text('配置')
+              .fontSize(FontSize.display).fontWeight(FontWeight.Bold).width('100%')
+              .margin({ bottom: Space.sm })
+
+            ConfigSection({
+              config: this.config,
+              busy: this.busy,
+              onSave: () => {
+                this.run(async (ctx: common.UIAbilityContext) => {
+                  await this.config.save(ctx);
+                });
+              }
+            })
+
+            SelfTestSection({
+              config: this.config,
+              busy: this.busy,
+              cases: this.testCases,
+              onSelfTest: () => {
+                this.run(async (ctx: common.UIAbilityContext) => {
+                  await this.config.runSelfTest();
+                });
+              },
+              onSendTest: () => {
+                this.run(async (ctx: common.UIAbilityContext) => {
+                  await this.config.sendTest();
+                });
+              }
+            })
+          }
+          .width('100%').padding({ left: Space.xl, right: Space.xl, top: Space.xxl })
+          .alignItems(HorizontalAlign.Start)
+        }
+        .width('100%').height('100%').scrollBar(BarState.Auto)
+      }
+      .tabBar(this.tabBar(this.tabs[1]))
+
+      // ---------- 诊断 ----------
+      TabContent() {
+        Scroll() {
+          Column() {
+            Text('诊断')
+              .fontSize(FontSize.display).fontWeight(FontWeight.Bold).width('100%')
+              .margin({ bottom: Space.md })
+
+            DiagnosticSection({
+              diag: this.diag,
+              busy: this.busy,
+              onDrain: () => {
+                this.run(async (ctx: common.UIAbilityContext) => {
+                  await this.diag.drainNow(ctx);
+                });
+              },
+              onClearDiagnostics: () => {
+                this.run(async (ctx: common.UIAbilityContext) => {
+                  await this.diag.clear(ctx);
+                });
+              }
+            })
+          }
+          .width('100%').padding({ left: Space.xl, right: Space.xl, top: Space.xxl })
+          .alignItems(HorizontalAlign.Start)
+        }
+        .width('100%').height('100%').scrollBar(BarState.Auto)
+      }
+      .tabBar(this.tabBar(this.tabs[2]))
+
+      // ---------- 我 ----------
+      TabContent() {
+        Scroll() {
+          Column() {
+            Text('我')
+              .fontSize(FontSize.display).fontWeight(FontWeight.Bold).width('100%')
+              .margin({ bottom: Space.md })
+
+            MineSection({
+              version: APP_VERSION,
+              onPendingTap: (label: string) => {
+                this.link.notice = `「${label}」尚未开放。`;
+              }
+            })
+          }
+          .width('100%').padding({ left: Space.xl, right: Space.xl, top: Space.xxl })
+          .alignItems(HorizontalAlign.Start)
+        }
+        .width('100%').height('100%').scrollBar(BarState.Auto)
+      }
+      .tabBar(this.tabBar(this.tabs[3]))
+    }
+    .barPosition(BarPosition.End)
+    .animationDuration(200)
+    .onAnimationStart((index: number, targetIndex: number) => {
+      // 高亮必须在动画「开始」时就跟上。
+      // 官方文档对自定义 tabBar 有明确提示：只靠 onChange 会滞后，
+      // 因为它是在切换动画结束之后才触发的——快速连点时高亮会明显落后于内容。
+      this.activeTab = targetIndex;
+    })
+    .onChange((index: number) => {
+      // 兜底：animationDuration 为 0 时 onAnimationStart 不会触发。
+      // 重复赋同一个值没有副作用。
+      this.activeTab = index;
+    })
+    .width('100%')
+    .height('100%')
   }
 }

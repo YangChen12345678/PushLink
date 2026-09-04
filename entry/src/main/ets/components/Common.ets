@@ -33,6 +33,23 @@ export struct SectionHeader {
 }
 
 /**
+ * 分组标题。分标签页之后原来的「第 N 部分」编号失去了意义——
+ * 编号只在真正存在先后顺序时才该出现。
+ */
+@Component
+export struct GroupTitle {
+  @Prop text: string = '';
+
+  build() {
+    Text(this.text)
+      .fontSize(FontSize.micro)
+      .fontColor(Tok.muted)
+      .width('100%')
+      .margin({ top: Space.lg, bottom: Space.xs, left: Space.xs })
+  }
+}
+
+/**
  * 一行「标签 — 值」状态。
  *
  * 做成 @Component 而不是 @Builder：@Builder 传简单类型时是按值传递，

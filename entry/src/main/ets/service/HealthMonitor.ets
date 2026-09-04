@@ -31,6 +31,14 @@ export class HealthMonitor {
   /** 两次提醒的最小间隔，兜住状态短时间反复跳变的情况。 */
   private static lastNotifiedAt: number = 0;
   private static readonly MIN_INTERVAL_MS: number = 30000;
+  /**
+   * 蓝牙状态变化的订阅者。
+   *
+   * 界面此前只在 onPageShow 时刷新，而从控制中心开关蓝牙并不会让应用真正经历
+   * 前后台切换——结果是必须手动重开应用才能看到新状态。
+   * 监听信号本来就在这里，接出去给界面用即可，不必再开第二个监听器。
+   */
+  private static watchers: Array<() => void> = [];
 
   /** 开始监听。幂等，重复调用不会叠加监听器。 */
   static start(): void {
@@ -40,6 +48,14 @@ export class HealthMonitor {
     const handler = (state: access.BluetoothState): void => {
       const wasOff: boolean = HealthMonitor.lastState === access.BluetoothState.STATE_OFF;
       HealthMonitor.lastState = state;
+
+      // 只在稳定态通知界面。TURNING_ON / TURNING_OFF 这些中间态刷新了也没意义，
+      // 反而会在一次开关里触发好几轮无谓的查询。
+      if (state === access.BluetoothState.STATE_ON || state === access.BluetoothState.STATE_OFF) {
+        for (const watcher of HealthMonitor.watchers) {
+          watcher();
+        }
+      }
       // 只关心「非关闭 → 关闭」这一个跃迁。打开时不打扰用户——
       // 界面自己会变绿，没必要再推一条通知。
       if (state !== access.BluetoothState.STATE_OFF || wasOff) {
@@ -82,6 +98,21 @@ export class HealthMonitor {
     HealthMonitor.listener = undefined;
     HealthMonitor.lastState = undefined;
     Logger.i(SCOPE, 'monitor stopped');
+  }
+
+  /**
+   * 订阅蓝牙状态变化，用于让界面即时跟上。
+   * 调用方必须在销毁时 removeWatcher，否则页面被回收后回调仍会持有它的引用。
+   */
+  static addWatcher(watcher: () => void): void {
+    HealthMonitor.watchers.push(watcher);
+  }
+
+  static removeWatcher(watcher: () => void): void {
+    const index: number = HealthMonitor.watchers.indexOf(watcher);
+    if (index >= 0) {
+      HealthMonitor.watchers.splice(index, 1);
+    }
   }
 
   /** 通知权限是否已开启。未开启时提醒发不出去，界面要能告诉用户。 */

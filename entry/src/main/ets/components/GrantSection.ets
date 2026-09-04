@@ -1,7 +1,7 @@
 import { Color as Tok, FontSize, Space } from '../theme/Tokens';
 import { GrantedBundle } from '../common/Types';
 import { LinkState } from '../viewmodel/LinkState';
-import { SectionCard, SectionHeader } from './Common';
+import { GroupTitle, SectionCard } from './Common';
 
 /** 区 3：系统通知白名单。系统授权列表是唯一来源，本应用不另设开关。 */
 @Component
@@ -12,7 +12,7 @@ export struct GrantSection {
 
   build() {
     Column() {
-      SectionHeader({ index: 3, title: '系统通知白名单授权' })
+      GroupTitle({ text: '通知白名单' })
       SectionCard() {
         Text('系统授权列表是唯一白名单，本应用不另设开关。未在列表中的来源一律丢弃。')
           .fontSize(FontSize.footnote).fontColor(Tok.muted).width('100%')

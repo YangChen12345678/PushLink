@@ -1,6 +1,8 @@
 import { common } from '@kit.AbilityKit';
 import { Color as Tok, FontSize, Radius, Space } from '../theme/Tokens';
 import { LinkState } from '../viewmodel/LinkState';
+import { Motion } from '../theme/Motion';
+import { FlowBar } from './FlowBar';
 
 /** 当前最该先解决的问题。蓝牙是前提，排最前。 */
 export enum LinkIssue {
@@ -36,6 +38,8 @@ export function primaryIssue(link: LinkState): LinkIssue {
 export struct HealthCard {
   @ObjectLink link: LinkState;
   @Prop busy: boolean = false;
+  /** 省电模式或低电量时不播放持续动画。只在组件创建时判定一次即可。 */
+  private canAnimate: boolean = Motion.allowContinuousAnimation();
   onOpenGrantSettings: () => void = () => {};
   onOpenBluetoothSettings: () => void = () => {};
   onGotoSubscribe: () => void = () => {};
@@ -83,6 +87,26 @@ export struct HealthCard {
   }
 
   build() {
+    Row() {
+      FlowBar({
+        active: this.link.healthy() && this.canAnimate,
+        baseColor: this.link.healthy() ? Tok.ok : Tok.error
+      })
+      this.content()
+    }
+    .width('100%')
+    .backgroundColor(Tok.card)
+    .borderRadius(Radius.card)
+    // 裁掉溢出，让色条跟着卡片一起圆角。
+    .clip(true)
+    .accessibilityGroup(true)
+    .accessibilityText(this.link.healthy()
+      ? '转发链路正常'
+      : `转发链路已中断，${this.issueText()}`)
+  }
+
+  @Builder
+  content() {
     Column() {
       Text('转发链路')
         .fontSize(FontSize.micro)
@@ -116,19 +140,8 @@ export struct HealthCard {
           .onClick(() => { this.fire(); })
       }
     }
-    .width('100%')
+    .layoutWeight(1)
     .padding(Space.lg)
-    .backgroundColor(Tok.card)
-    .borderRadius(Radius.card)
     .alignItems(HorizontalAlign.Start)
-    // 左侧色条：绿正常、红中断。比整卡染色克制，也不会喧宾夺主。
-    .border({
-      width: { left: 4 },
-      color: { left: this.link.healthy() ? Tok.ok : Tok.error }
-    })
-    .accessibilityGroup(true)
-    .accessibilityText(this.link.healthy()
-      ? '转发链路正常'
-      : `转发链路已中断，${this.issueText()}`)
   }
 }

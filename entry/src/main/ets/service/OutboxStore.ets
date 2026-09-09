@@ -9,7 +9,14 @@ const SCOPE: string = 'OutboxStore';
 /** 队列上限。超出后丢弃最旧的，防止长时间断网把库撑爆。 */
 export const OUTBOX_MAX: number = 100;
 /** 有效期 30 分钟。超过这个时间的通知再送达已无意义，只会打扰。 */
-export const OUTBOX_TTL_MS: number = 30 * 60 * 1000;
+/**
+ * 队列里一条记录的存活时间。
+ *
+ * 曾取 30 分钟，但兜底重投任务由系统择机调度、间隔可能就有二十几分钟，
+ * 一次没赶上记录就过期了——消息真丢。放到 6 小时，让它有足够多次被重投的机会。
+ * 更长意义不大：隔了半天才推到手机上的通知，价值已经很低。
+ */
+export const OUTBOX_TTL_MS: number = 6 * 60 * 60 * 1000;
 /** 每轮最多发送条数，避免一次唤醒里长时间占用网络与唤醒锁。 */
 export const DRAIN_BATCH: number = 10;
 

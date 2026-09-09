@@ -35,6 +35,22 @@
     {
       "name": "pl_on_accent",
       "value": "#FFFFFF"
+    },
+    {
+      "name": "pl_glow",
+      "value": "#12262B"
+    },
+    {
+      "name": "pl_page_bg",
+      "value": "#0E131A"
+    },
+    {
+      "name": "pl_flow_light",
+      "value": "#4FC3CE"
+    },
+    {
+      "name": "pl_bar_bg",
+      "value": "#80121418"
     }
   ]
 }

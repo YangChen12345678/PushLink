@@ -64,3 +64,40 @@ export function composeTitle(appLabel: string, rawTitle: string): string {
   }
   return prefix + truncateUtf8(rawTitle, TITLE_MAX_BYTES - prefixBytes);
 }
+
+/**
+ * 载荷指纹：不含任何内容，只统计那些肉眼看不见、却可能破坏 JSON 或编码的东西。
+ *
+ * 用来对照「同样都发成功了，为什么有的 iPhone 解得开、有的解不开」——
+ * 应用侧的密文长度、IV、HTTP 状态全部正常时，剩下的差异只可能藏在明文的形状里。
+ */
+export function shapeOf(text: string): string {
+  let nl: number = 0;      // 换行
+  let ctrl: number = 0;    // 其他控制字符
+  let astral: number = 0;  // 代理对（emoji 等增补平面字符）
+  let bytes: number = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c: number = text.charCodeAt(i);
+    if (c === 10 || c === 13) {
+      nl++;
+    } else if (c < 32 || c === 127) {
+      ctrl++;
+    }
+    if (c >= 0xD800 && c <= 0xDBFF) {
+      astral++;
+    }
+    // UTF-8 字节数：代理对的低位不再单独计。
+    if (c < 0x80) {
+      bytes += 1;
+    } else if (c < 0x800) {
+      bytes += 2;
+    } else if (c >= 0xDC00 && c <= 0xDFFF) {
+      bytes += 0;
+    } else if (c >= 0xD800 && c <= 0xDBFF) {
+      bytes += 4;
+    } else {
+      bytes += 3;
+    }
+  }
+  return `b=${bytes} nl=${nl} ctrl=${ctrl} astral=${astral}`;
+}

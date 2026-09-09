@@ -95,7 +95,7 @@ export class LinkState {
   async requestNotifyPermission(ctx: common.UIAbilityContext): Promise<void> {
     this.notifyEnabled = await HealthMonitor.requestPermission(ctx);
     if (!this.notifyEnabled) {
-      this.notice = '未获得通知权限，链路中断时无法提醒你。可在系统设置里手动开启。';
+      this.notice = '未获得通知权限，链路中断时无法提醒你。可在系统设置里手动开启';
     }
   }
 
@@ -109,13 +109,13 @@ export class LinkState {
 
   async requestBluetooth(ctx: common.UIAbilityContext): Promise<void> {
     const granted: boolean = await PermissionService.requestBluetooth(ctx);
-    this.notice = granted ? '' : '蓝牙权限未授予。若之前选过“禁止后不再询问”，需到系统设置手动开启。';
+    this.notice = granted ? '' : '蓝牙权限未授予。若之前选过“禁止后不再询问”，需到系统设置手动开启';
     this.refreshBluetooth();
   }
 
   async subscribe(): Promise<void> {
     if (this.selectedAddr.length === 0) {
-      this.notice = '请先选择一台已配对设备。';
+      this.notice = '请先选择一台已配对设备';
       return;
     }
     this.notice = await SubscriptionService.subscribe(this.selectedAddr);

@@ -19,6 +19,8 @@ export default class NotificationSubscriberExtAbility extends NotificationSubscr
   private receivedCount: number = 0;
 
   onReceiveMessage(notificationInfo: notificationExtensionSubscription.NotificationInfo): void {
+    // 扩展进程会被反复回收，每次进来都要重挂——attachFile 只是赋两个变量，代价可忽略。
+    Logger.attachFile(this.context.filesDir, 'ext');
     this.receivedCount++;
 
     // hashCode 是系统内部标识，不含用户内容，完整记录以便与 onCancelMessages 对账。
@@ -35,6 +37,7 @@ export default class NotificationSubscriberExtAbility extends NotificationSubscr
   }
 
   onCancelMessages(hashCodes: Array<string>): void {
+    Logger.attachFile(this.context.filesDir, 'ext');
     Logger.i(SCOPE, `onCancelMessages count=${hashCodes.length} hashes=[${hashCodes.join(',')}]`);
 
     ForwardPipeline.handleCancel(this.context, hashCodes)

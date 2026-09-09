@@ -118,12 +118,8 @@ export struct ConfigSection {
             .onClick(() => { this.onSave(); })
         }.width('100%').margin({ top: Space.md })
 
-        if (this.config.notice.length > 0) {
-          Text(this.config.notice)
-            .fontSize(FontSize.footnote)
-            .fontColor(this.config.notice === '已保存。' ? Tok.ok : Tok.error)
-            .width('100%')
-        }
+        // 保存结果不在页面里显示了——由页面统一弹成浮层，
+        // 页面中间的一行小字太容易被忽略。
       }
     }
     .width('100%')

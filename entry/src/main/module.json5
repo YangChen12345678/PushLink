@@ -102,6 +102,12 @@
         "description": "$string:NotificationSubscriberExtAbility_desc",
         "label": "$string:NotificationSubscriberExtAbility_label",
         "exported": false
+      },
+      {
+        "name": "RetryWorkAbility",
+        "srcEntry": "./ets/workscheduler/RetryWorkAbility.ets",
+        "type": "workScheduler",
+        "exported": false
       }
     ]
   }

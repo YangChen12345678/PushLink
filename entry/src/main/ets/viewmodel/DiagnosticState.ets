@@ -22,7 +22,7 @@ export class DiagnosticState {
   }
 
   async drainNow(ctx: common.Context): Promise<void> {
-    await ForwardPipeline.drain(ctx);
+    await ForwardPipeline.drain(ctx, undefined, 'ui-manual');
     await this.refresh(ctx);
   }
 }

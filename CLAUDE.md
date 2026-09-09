@@ -36,7 +36,7 @@ hdc shell hilog -r                          # 清空
 
 ---
 
-## 五个会造成真实故障的坑
+## 六个会造成真实故障的坑
 
 ### 1. ArkUI 的参数默认不是响应式的
 
@@ -91,6 +91,12 @@ return Database.opening;   // open 失败后，这里永远返回同一个已拒
 
 ## 不可违反的约束
 
+- **UI 一律用原生 ArkUI 组件**，不用 HDS（`@kit.UIDesignKit` 的 `Hds*`）或其他封装层。
+  吃过亏：为了「接入 HDS」用 `HdsSnackBar` 做提示，它宽度只能给固定值、没有内容自适应，
+  文字对齐也控制不了（`contentModifier` 的 `width` 被浮层内部布局覆盖），
+  连改三轮没弄对；换成原生 `promptAction.showToast` 后胶囊形、自适应宽度、文字居中全部开箱即用。
+  **组件选错，后面所有调参都是白费力气。**
+
 - **日志绝不出现通知标题、正文、Device Key、加密密钥。** 一律走 `Logger` + `Redact`，
   只输出长度（`Redact.len`）或掩码（`Redact.addr`）。有测试覆盖。
 - **白名单默认拒绝。** 未在系统授权列表中的来源、查询失败、名单为空 —— 一律丢弃。
@@ -115,6 +121,19 @@ return Database.opening;   // open 失败后，这里永远返回同一个已拒
 
 ---
 
+### 6. 应用图标有两份，改一份不生效
+
+```
+AppScope/resources/base/media/       ← 应用级。桌面图标走这份
+entry/src/main/resources/base/media/ ← 模块级。只管 ability
+```
+
+两处都有同名的 `foreground.png` / `background.png` / `layered_image.json`，
+`AppScope/app.json5` 的 `"icon": "$media:layered_image"` 解析的是 **AppScope 自己那套**，
+与 entry 里的同名文件互不相干。**换图标必须同时替换两处**，只改 entry 的话桌面纹丝不动。
+
+覆盖安装后桌面若仍是旧图，先排除启动器图标缓存再怀疑配置。
+
 ## 目录约定（阶段 E 建立）
 
 ```
@@ -127,6 +146,10 @@ pages/       只做组装与跨状态编排
 
 新增颜色要**同时**加进 `resources/base/element/color.json` 和 `resources/dark/`，
 否则深色模式下会与系统组件割裂。
+
+标签栏图标是 `base/media/` 与 `dark/media/` 各一套 SVG（`tab_*.svg` / `tab_*_on.svg`），
+颜色写死在 SVG 里、由资源系统按深浅色挑，**不走 `fillColor`**——
+`fillColor` 只作用于 `fill`，而这些图标主要靠 `stroke` 成形，交给它会有一半不生效。
 
 ---
 

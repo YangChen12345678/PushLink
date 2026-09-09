@@ -43,17 +43,17 @@ export class ConfigState {
 
   async save(ctx: common.Context): Promise<void> {
     if (this.encryptKey.length !== 32) {
-      this.notice = `加密 Key 必须是 32 个字符，当前 ${this.encryptKey.length} 个。`;
+      this.notice = `加密 Key 必须是 32 个字符，当前 ${this.encryptKey.length} 个`;
       return;
     }
     if (this.deviceKey.length === 0) {
-      this.notice = '请填写 Device Key。';
+      this.notice = '请填写 Device Key';
       return;
     }
     const err: string = await ConfigStore.save(ctx, this.current());
     if (err.length === 0) {
       this.dirty = false;
-      this.notice = '已保存。';
+      this.notice = '已保存';
     } else {
       this.notice = err;
     }
@@ -62,7 +62,7 @@ export class ConfigState {
   /** 本地往返自检，不联网。跑通它才有资格谈和 iPhone 的互通。 */
   async runSelfTest(): Promise<void> {
     if (this.encryptKey.length !== 32) {
-      this.notice = '请先填入 32 个字符的加密 Key。';
+      this.notice = '请先填入 32 个字符的加密 Key';
       return;
     }
     this.selfTestResults = [];

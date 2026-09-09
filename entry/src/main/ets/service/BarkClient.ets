@@ -7,6 +7,12 @@ import { BarkCrypto } from '../crypto/BarkCrypto';
 const SCOPE: string = 'BarkClient';
 const TIMEOUT_MS: number = 8000;
 
+/** 撤回请求的载荷。和推送一样要加密后再发，服务端解密才认得出 delete 标记。 */
+interface BarkDeletePayload {
+  id: string;
+  delete: string;
+}
+
 /** 加密前的 Bark 载荷。字段名与顺序按 Bark 约定，不要改。 */
 export interface BarkPayload {
   title: string;
@@ -74,10 +80,32 @@ export class BarkClient {
    * 撤回一条已投递的消息。这是控制消息，不携带任何正文。
    * iPhone 端需要开启 Bark 的「后台 App 刷新」才会真正删除。
    */
+  /**
+   * 撤回一条已投递的消息。
+   *
+   * **撤回请求也必须加密**。设备开了加密之后，Bark 在 `POST /{device_key}` 上只认
+   * ciphertext——收到一个没有密文的请求，它会当成解密失败并推一条 Decryption Failed
+   * 给客户端。实测日志里撤回比推送还频繁（29 : 23），所以那条提示才会时不时自己冒出来。
+   *
+   * 参数放进加密的 payload 里，和推送走同一条路径，服务端解密后自然拿得到 delete 标记。
+   */
   static async deleteMessage(config: BarkConfig, id: string): Promise<BarkSendResult> {
     const started: number = Date.now();
-    const form: string = `id=${encodeURIComponent(id)}&delete=1`;
-    return BarkClient.send(BarkClient.deviceEndpoint(config), form, started, 'delete');
+    try {
+      const iv: string = BarkCrypto.generateIv();
+      const payload: BarkDeletePayload = { id: id, delete: '1' };
+      const ciphertext: string =
+        await BarkCrypto.encrypt(JSON.stringify(payload), config.encryptKey, iv);
+      return BarkClient.post(config, ciphertext, iv, id, started);
+    } catch (err) {
+      const e: Error = err as Error;
+      Logger.e(SCOPE, `delete encrypt failed: ${e.message}`);
+      return {
+        ok: false, httpCode: 0, barkCode: 0,
+        message: `撤回加密失败：${e.message}`,
+        elapsedMs: Date.now() - started
+      };
+    }
   }
 
   private static async post(config: BarkConfig, ciphertext: string, iv: string,
